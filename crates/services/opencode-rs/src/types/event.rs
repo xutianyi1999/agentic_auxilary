@@ -612,6 +612,138 @@ pub enum Event {
         properties: serde_json::Value,
     },
 
+    // ==================== Session Next (23) ====================
+    /// Session next agent switched.
+    #[serde(rename = "session.next.agent.switched")]
+    SessionNextAgentSwitched {
+        properties: SessionNextProps,
+    },
+    /// Session next model switched.
+    #[serde(rename = "session.next.model.switched")]
+    SessionNextModelSwitched {
+        properties: SessionNextProps,
+    },
+    /// Session next prompted.
+    #[serde(rename = "session.next.prompted")]
+    SessionNextPrompted {
+        properties: SessionNextProps,
+    },
+    /// Session next synthetic.
+    #[serde(rename = "session.next.synthetic")]
+    SessionNextSynthetic {
+        properties: SessionNextProps,
+    },
+    /// Session next shell started.
+    #[serde(rename = "session.next.shell.started")]
+    SessionNextShellStarted {
+        properties: SessionNextProps,
+    },
+    /// Session next shell ended.
+    #[serde(rename = "session.next.shell.ended")]
+    SessionNextShellEnded {
+        properties: SessionNextProps,
+    },
+    /// Session next step started.
+    #[serde(rename = "session.next.step.started")]
+    SessionNextStepStarted {
+        properties: SessionNextProps,
+    },
+    /// Session next step ended.
+    #[serde(rename = "session.next.step.ended")]
+    SessionNextStepEnded {
+        properties: SessionNextProps,
+    },
+    /// Session next step failed.
+    #[serde(rename = "session.next.step.failed")]
+    SessionNextStepFailed {
+        properties: SessionNextProps,
+    },
+    /// Session next text started.
+    #[serde(rename = "session.next.text.started")]
+    SessionNextTextStarted {
+        properties: SessionNextProps,
+    },
+    /// Session next text delta.
+    #[serde(rename = "session.next.text.delta")]
+    SessionNextTextDelta {
+        properties: SessionNextProps,
+    },
+    /// Session next text ended.
+    #[serde(rename = "session.next.text.ended")]
+    SessionNextTextEnded {
+        properties: SessionNextProps,
+    },
+    /// Session next reasoning started.
+    #[serde(rename = "session.next.reasoning.started")]
+    SessionNextReasoningStarted {
+        properties: SessionNextProps,
+    },
+    /// Session next reasoning delta.
+    #[serde(rename = "session.next.reasoning.delta")]
+    SessionNextReasoningDelta {
+        properties: SessionNextProps,
+    },
+    /// Session next reasoning ended.
+    #[serde(rename = "session.next.reasoning.ended")]
+    SessionNextReasoningEnded {
+        properties: SessionNextProps,
+    },
+    /// Session next tool input started.
+    #[serde(rename = "session.next.tool.input.started")]
+    SessionNextToolInputStarted {
+        properties: SessionNextProps,
+    },
+    /// Session next tool input delta.
+    #[serde(rename = "session.next.tool.input.delta")]
+    SessionNextToolInputDelta {
+        properties: SessionNextProps,
+    },
+    /// Session next tool input ended.
+    #[serde(rename = "session.next.tool.input.ended")]
+    SessionNextToolInputEnded {
+        properties: SessionNextProps,
+    },
+    /// Session next tool called.
+    #[serde(rename = "session.next.tool.called")]
+    SessionNextToolCalled {
+        properties: SessionNextProps,
+    },
+    /// Session next tool progress.
+    #[serde(rename = "session.next.tool.progress")]
+    SessionNextToolProgress {
+        properties: SessionNextProps,
+    },
+    /// Session next tool success.
+    #[serde(rename = "session.next.tool.success")]
+    SessionNextToolSuccess {
+        properties: SessionNextProps,
+    },
+    /// Session next tool failed.
+    #[serde(rename = "session.next.tool.failed")]
+    SessionNextToolFailed {
+        properties: SessionNextProps,
+    },
+    /// Session next retried.
+    #[serde(rename = "session.next.retried")]
+    SessionNextRetried {
+        properties: SessionNextProps,
+    },
+    /// Session next compaction started.
+    #[serde(rename = "session.next.compaction.started")]
+    SessionNextCompactionStarted {
+        properties: SessionNextProps,
+    },
+    /// Session next compaction delta.
+    #[serde(rename = "session.next.compaction.delta")]
+    SessionNextCompactionDelta {
+        properties: SessionNextProps,
+    },
+    /// Session next compaction ended.
+    #[serde(rename = "session.next.compaction.ended")]
+    SessionNextCompactionEnded {
+        properties: SessionNextProps,
+    },
+
     /// Fallback for unknown event types.
     #[serde(other)]
     Unknown,
@@ -742,6 +874,19 @@ pub struct PermissionRepliedProps {
     pub extra: serde_json::Value,
 }
 
+// ==================== Session Next Event Properties ====================
+
+/// Generic properties for session.next.* events.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionNextProps {
+    /// Session ID.
+    #[serde(rename = "sessionID")]
+    pub session_id: String,
+    /// Additional properties.
+    #[serde(flatten)]
+    pub extra: serde_json::Value,
+}
+
 // ==================== Question Event Properties ====================
 
 /// Properties for question.asked events.
@@ -807,6 +952,32 @@ impl Event {
             Self::QuestionAsked { properties } => Some(&properties.request.session_id),
             Self::QuestionReplied { properties } => Some(&properties.session_id),
             Self::QuestionRejected { properties } => Some(&properties.session_id),
+            Self::SessionNextAgentSwitched { properties }
+            | Self::SessionNextModelSwitched { properties }
+            | Self::SessionNextPrompted { properties }
+            | Self::SessionNextSynthetic { properties }
+            | Self::SessionNextShellStarted { properties }
+            | Self::SessionNextShellEnded { properties }
+            | Self::SessionNextStepStarted { properties }
+            | Self::SessionNextStepEnded { properties }
+            | Self::SessionNextStepFailed { properties }
+            | Self::SessionNextTextStarted { properties }
+            | Self::SessionNextTextDelta { properties }
+            | Self::SessionNextTextEnded { properties }
+            | Self::SessionNextReasoningStarted { properties }
+            | Self::SessionNextReasoningDelta { properties }
+            | Self::SessionNextReasoningEnded { properties }
+            | Self::SessionNextToolInputStarted { properties }
+            | Self::SessionNextToolInputDelta { properties }
+            | Self::SessionNextToolInputEnded { properties }
+            | Self::SessionNextToolCalled { properties }
+            | Self::SessionNextToolProgress { properties }
+            | Self::SessionNextToolSuccess { properties }
+            | Self::SessionNextToolFailed { properties }
+            | Self::SessionNextRetried { properties }
+            | Self::SessionNextCompactionStarted { properties }
+            | Self::SessionNextCompactionDelta { properties }
+            | Self::SessionNextCompactionEnded { properties } => Some(&properties.session_id),
             _ => None,
         }
     }
