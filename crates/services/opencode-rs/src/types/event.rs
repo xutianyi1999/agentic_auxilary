@@ -262,11 +262,12 @@ pub enum Event {
         properties: SessionInfoProps,
     },
 
-    /// Session updated.
+    /// Session updated (may carry partial info).
     #[serde(rename = "session.updated")]
     SessionUpdated {
-        /// Event properties with full session info.
-        properties: SessionInfoProps,
+        /// Event properties; info may be partial.
+        #[serde(default)]
+        properties: serde_json::Value,
     },
 
     /// Session deleted.
@@ -839,9 +840,9 @@ pub struct MessagePartEventProps {
     /// Updated part content.
     #[serde(default)]
     pub part: Option<crate::types::message::Part>,
-    /// Streaming delta (incremental text).
+    /// Streaming delta (incremental text or JSON tool args).
     #[serde(default)]
-    pub delta: Option<String>,
+    pub delta: Option<serde_json::Value>,
     /// Additional properties.
     #[serde(flatten)]
     pub extra: serde_json::Value,
@@ -936,8 +937,10 @@ impl Event {
     pub fn session_id(&self) -> Option<&str> {
         match self {
             Self::SessionCreated { properties }
-            | Self::SessionUpdated { properties }
             | Self::SessionDeleted { properties } => Some(&properties.info.id),
+            Self::SessionUpdated { properties } => {
+                properties.get("sessionID").and_then(|v| v.as_str())
+            }
             Self::SessionIdle { properties } => Some(&properties.session_id),
             Self::SessionError { properties } => properties.session_id.as_deref(),
             Self::MessageUpdated { properties } => properties.info.session_id.as_deref(),
