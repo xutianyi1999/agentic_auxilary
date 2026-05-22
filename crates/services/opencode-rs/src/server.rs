@@ -73,6 +73,10 @@ pub struct ServerOptions {
     /// Use this to pass custom configuration, secrets, or feature flags
     /// without modifying the system environment.
     pub env_vars: HashMap<String, String>,
+    /// Enable `--print-logs` on the serve command (prints internal logs to stderr).
+    ///
+    /// Useful for debugging tool execution hangs and other server-side issues.
+    pub print_logs: bool,
 }
 
 impl Default for ServerOptions {
@@ -86,6 +90,7 @@ impl Default for ServerOptions {
             binary: "opencode".to_string(),
             launcher_args: Vec::new(),
             env_vars: HashMap::new(),
+            print_logs: false,
         }
     }
 }
@@ -148,6 +153,13 @@ impl ServerOptions {
         self
     }
 
+    /// Pass `--print-logs` flag to the serve command.
+    #[must_use]
+    pub fn print_logs(mut self, on: bool) -> Self {
+        self.print_logs = on;
+        self
+    }
+
     /// Set environment variables to inject into the server process.
     ///
     /// These variables are set on top of the parent process's environment.
@@ -204,9 +216,12 @@ impl ManagedServer {
             .arg("--hostname")
             .arg(&opts.hostname)
             .arg("--port")
-            .arg(port.to_string())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit()) // Inherit to avoid deadlock; server errors visible to user
+            .arg(port.to_string());
+        if opts.print_logs {
+            cmd.arg("--print-logs");
+        }
+        cmd.stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
             .kill_on_drop(true);
 
         #[cfg(unix)]
