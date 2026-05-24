@@ -1038,7 +1038,7 @@ mod tests {
         let json = r#"{"type":"message.part.updated","properties":{"sessionID":"s1","messageID":"m1","delta":"Hello"}}"#;
         let event: Event = serde_json::from_str(json).unwrap();
         if let Event::MessagePartUpdated { properties } = &event {
-            assert_eq!(properties.delta, Some("Hello".to_string()));
+            assert_eq!(properties.delta, Some(serde_json::Value::String("Hello".to_string())));
         } else {
             panic!("Expected MessagePartUpdated");
         }

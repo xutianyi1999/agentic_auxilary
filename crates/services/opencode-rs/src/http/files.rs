@@ -110,8 +110,8 @@ mod tests {
             .and(path("/file/content"))
             .and(query_param("path", "main.rs"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "path": "main.rs",
-                "content": "fn main() {}"
+                "content": "fn main() {}",
+                "mimeType": "text/x-rust"
             })))
             .mount(&mock_server)
             .await;

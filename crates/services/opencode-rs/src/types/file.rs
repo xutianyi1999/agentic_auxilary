@@ -24,16 +24,17 @@ pub struct FileInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileContent {
-    /// File path.
-    pub path: String,
     /// File content.
     pub content: String,
     /// MIME type.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mime: Option<String>,
+    pub mime_type: Option<String>,
     /// Encoding (e.g., "utf-8", "base64").
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encoding: Option<String>,
+    /// Content type ("text" or "binary").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
 }
 
 /// File status in VCS.
