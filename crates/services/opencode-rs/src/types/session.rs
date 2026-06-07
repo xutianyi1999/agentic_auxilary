@@ -327,8 +327,6 @@ pub type SessionDiff = Vec<SnapshotFileDiff>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TodoItem {
-    /// Todo ID.
-    pub id: String,
     /// Todo content.
     pub content: String,
     /// Whether completed.
