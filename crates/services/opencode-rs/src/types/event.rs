@@ -378,7 +378,7 @@ pub enum Event {
         properties: serde_json::Value,
     },
 
-    // ==================== Permissions (4) ====================
+    // ==================== Permissions (6) ====================
     /// Permission updated.
     #[serde(rename = "permission.updated")]
     PermissionUpdated {
@@ -394,16 +394,30 @@ pub enum Event {
         properties: PermissionRepliedProps,
     },
 
-    /// Permission asked.
+    /// Permission asked (V1).
     #[serde(rename = "permission.asked")]
     PermissionAsked {
         /// Event properties with permission request.
         properties: PermissionAskedProps,
     },
 
+    /// Permission asked (V2 — flattened `permission.v2.asked`).
+    #[serde(rename = "permission.v2.asked")]
+    PermissionV2Asked {
+        /// Event properties with permission request.
+        properties: PermissionV2AskedProps,
+    },
+
     /// Permission replied next.
     #[serde(rename = "permission.replied-next")]
     PermissionRepliedNext {
+        /// Event properties with reply info.
+        properties: PermissionRepliedProps,
+    },
+
+    /// Permission replied (V2).
+    #[serde(rename = "permission.v2.replied")]
+    PermissionV2Replied {
         /// Event properties with reply info.
         properties: PermissionRepliedProps,
     },
@@ -582,10 +596,17 @@ pub enum Event {
         properties: serde_json::Value,
     },
 
-    // ==================== Question (3) ====================
-    /// Question asked by the server.
+    // ==================== Question (6) ====================
+    /// Question asked by the server (V1).
     #[serde(rename = "question.asked")]
     QuestionAsked {
+        /// Event properties with question request.
+        properties: QuestionAskedProps,
+    },
+
+    /// Question asked by the server (V2 — flattened `question.v2.asked`).
+    #[serde(rename = "question.v2.asked")]
+    QuestionV2Asked {
         /// Event properties with question request.
         properties: QuestionAskedProps,
     },
@@ -597,9 +618,23 @@ pub enum Event {
         properties: QuestionRepliedProps,
     },
 
+    /// Question replied by the user (V2).
+    #[serde(rename = "question.v2.replied")]
+    QuestionV2Replied {
+        /// Event properties with reply info.
+        properties: QuestionRepliedProps,
+    },
+
     /// Question rejected by the user.
     #[serde(rename = "question.rejected")]
     QuestionRejected {
+        /// Event properties with rejection info.
+        properties: QuestionRejectedProps,
+    },
+
+    /// Question rejected by the user (V2).
+    #[serde(rename = "question.v2.rejected")]
+    QuestionV2Rejected {
         /// Event properties with rejection info.
         properties: QuestionRejectedProps,
     },
@@ -875,6 +910,48 @@ pub struct PermissionRepliedProps {
     pub extra: serde_json::Value,
 }
 
+/// Properties for permission.v2.asked events (flattened V2 schema).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionV2AskedProps {
+    /// Unique request identifier.
+    pub id: String,
+    /// Session ID.
+    #[serde(rename = "sessionID")]
+    pub session_id: String,
+    /// Permission action (e.g., "file.read", "bash.execute").
+    pub action: String,
+    /// Resources the permission applies to.
+    pub resources: Vec<String>,
+    /// Permission names that can be saved for future auto-approval.
+    #[serde(default)]
+    pub save: Option<Vec<String>>,
+    /// Arbitrary metadata.
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+    /// Tool source context if this permission is from a tool call.
+    #[serde(default)]
+    pub source: Option<PermissionV2Source>,
+    /// Additional fields from server.
+    #[serde(flatten)]
+    pub extra: serde_json::Value,
+}
+
+/// Tool source context for V2 permission requests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionV2Source {
+    /// Source type (always "tool").
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// Message ID containing the tool call.
+    #[serde(rename = "messageID")]
+    pub message_id: String,
+    /// Tool call ID.
+    #[serde(rename = "callID")]
+    pub call_id: String,
+}
+
 // ==================== Session Next Event Properties ====================
 
 /// Generic properties for session.next.* events.
@@ -949,12 +1026,16 @@ impl Event {
                 properties.session_id.as_deref()
             }
             Self::PermissionAsked { properties } => Some(&properties.request.session_id),
-            Self::PermissionReplied { properties } | Self::PermissionRepliedNext { properties } => {
+            Self::PermissionV2Asked { properties } => Some(&properties.session_id),
+            Self::PermissionReplied { properties } | Self::PermissionRepliedNext { properties } | Self::PermissionV2Replied { properties } => {
                 Some(&properties.session_id)
             }
             Self::QuestionAsked { properties } => Some(&properties.request.session_id),
+            Self::QuestionV2Asked { properties } => Some(&properties.request.session_id),
             Self::QuestionReplied { properties } => Some(&properties.session_id),
+            Self::QuestionV2Replied { properties } => Some(&properties.session_id),
             Self::QuestionRejected { properties } => Some(&properties.session_id),
+            Self::QuestionV2Rejected { properties } => Some(&properties.session_id),
             Self::SessionNextAgentSwitched { properties }
             | Self::SessionNextModelSwitched { properties }
             | Self::SessionNextPrompted { properties }
