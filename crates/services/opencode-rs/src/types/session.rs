@@ -329,10 +329,10 @@ pub type SessionDiff = Vec<SnapshotFileDiff>;
 pub struct TodoItem {
     /// Todo content.
     pub content: String,
-    /// Whether completed.
+    /// Status: pending, in_progress, completed, cancelled.
     #[serde(default)]
-    pub completed: bool,
-    /// Priority.
+    pub status: String,
+    /// Priority: high, medium, low.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub priority: Option<String>,
 }

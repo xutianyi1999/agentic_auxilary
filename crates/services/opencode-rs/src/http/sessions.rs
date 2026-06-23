@@ -601,8 +601,8 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/session/s1/todo"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
-                {"id": "t1", "content": "Task 1", "completed": false},
-                {"id": "t2", "content": "Task 2", "completed": true}
+                {"id": "t1", "content": "Task 1", "status": "pending", "priority": "high"},
+                {"id": "t2", "content": "Task 2", "status": "completed", "priority": "low"}
             ])))
             .mount(&mock_server)
             .await;
@@ -618,8 +618,8 @@ mod tests {
         let sessions = SessionsApi::new(http);
         let todos = sessions.todo("s1").await.unwrap();
         assert_eq!(todos.len(), 2);
-        assert!(!todos[0].completed);
-        assert!(todos[1].completed);
+        assert_eq!(todos[0].status, "pending");
+        assert_eq!(todos[1].status, "completed");
     }
 
     #[tokio::test]
