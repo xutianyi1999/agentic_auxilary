@@ -1,6 +1,8 @@
 //! Session types for `opencode_rs`.
 
+use crate::types::message::TokenUsage;
 use crate::types::permission::Ruleset;
+use crate::types::project::ModelRef;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -45,6 +47,24 @@ pub struct Session {
     /// Revert information.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub revert: Option<RevertInfo>,
+    /// Workspace ID.
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "workspaceID")]
+    pub workspace_id: Option<String>,
+    /// Active agent name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// Active model reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelRef>,
+    /// Session cost.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
+    /// Token usage.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tokens: Option<TokenUsage>,
+    /// Arbitrary session metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
     /// Additional fields from server.
     #[serde(flatten)]
     pub extra: serde_json::Value,

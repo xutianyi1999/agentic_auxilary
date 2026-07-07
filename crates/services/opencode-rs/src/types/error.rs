@@ -6,12 +6,10 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
 
-/// API error from the `OpenCode` server.
-///
-/// Matches the TypeScript `MessageV2.APIError` schema.
+/// Flat error data fields (the inner part of TS `ApiError.data`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct APIError {
+pub struct ApiErrorData {
     /// Error message.
     pub message: String,
     /// HTTP status code if applicable.
@@ -30,7 +28,16 @@ pub struct APIError {
     pub metadata: Option<HashMap<String, String>>,
 }
 
-impl std::fmt::Display for APIError {
+/// TS-compatible `ApiError` wrapper `{name, data}`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ApiError {
+    /// Always `"APIError"` in production.
+    pub name: String,
+    /// Nested error payload.
+    pub data: ApiErrorData,
+}
+
+impl std::fmt::Display for ApiErrorData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.message)?;
         if let Some(code) = self.status_code {
@@ -40,23 +47,38 @@ impl std::fmt::Display for APIError {
     }
 }
 
-impl std::error::Error for APIError {}
+impl std::error::Error for ApiErrorData {}
+
+impl std::fmt::Display for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.data.message)?;
+        if let Some(code) = self.data.status_code {
+            write!(f, " (status: {code})")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for ApiError {}
+
+/// Legacy alias — prefer `ApiError` / `ApiErrorData` for new code.
+pub type APIError = ApiErrorData;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_api_error_minimal() {
+    fn test_api_error_data_minimal() {
         let json = r#"{"message":"Something went wrong","isRetryable":false}"#;
-        let error: APIError = serde_json::from_str(json).unwrap();
+        let error: ApiErrorData = serde_json::from_str(json).unwrap();
         assert_eq!(error.message, "Something went wrong");
         assert!(!error.is_retryable);
         assert!(error.status_code.is_none());
     }
 
     #[test]
-    fn test_api_error_full() {
+    fn test_api_error_data_full() {
         let json = r#"{
             "message": "Rate limited",
             "statusCode": 429,
@@ -65,7 +87,7 @@ mod tests {
             "responseBody": "Too many requests",
             "metadata": {"region": "us-east-1"}
         }"#;
-        let error: APIError = serde_json::from_str(json).unwrap();
+        let error: ApiErrorData = serde_json::from_str(json).unwrap();
         assert_eq!(error.message, "Rate limited");
         assert_eq!(error.status_code, Some(429));
         assert!(error.is_retryable);
@@ -81,8 +103,8 @@ mod tests {
     }
 
     #[test]
-    fn test_api_error_display() {
-        let error = APIError {
+    fn test_api_error_data_display() {
+        let error = ApiErrorData {
             message: "Not found".to_string(),
             status_code: Some(404),
             is_retryable: false,
@@ -94,20 +116,11 @@ mod tests {
     }
 
     #[test]
-    fn test_api_error_roundtrip() {
-        let error = APIError {
-            message: "Test error".to_string(),
-            status_code: Some(500),
-            is_retryable: true,
-            response_headers: Some(HashMap::from([(
-                "x-request-id".to_string(),
-                "123".to_string(),
-            )])),
-            response_body: Some("Internal error".to_string()),
-            metadata: None,
-        };
-        let json = serde_json::to_string(&error).unwrap();
-        let parsed: APIError = serde_json::from_str(&json).unwrap();
-        assert_eq!(error, parsed);
+    fn test_api_error_wrapper() {
+        let json = r#"{"name":"APIError","data":{"message":"Rate limited","isRetryable":true}}"#;
+        let error: ApiError = serde_json::from_str(json).unwrap();
+        assert_eq!(error.name, "APIError");
+        assert_eq!(error.data.message, "Rate limited");
+        assert!(error.data.is_retryable);
     }
 }

@@ -117,7 +117,7 @@ mod tests {
                 provider: Some(serde_json::json!("openai")),
                 model: Some(serde_json::json!("gpt-4")),
                 agent: None,
-                auto_compact: None,
+                compaction: None,
                 mcp: None,
                 extra: serde_json::Value::Null,
             })
@@ -180,7 +180,7 @@ mod tests {
                 provider: Some(serde_json::json!("invalid")),
                 model: None,
                 agent: None,
-                auto_compact: None,
+                compaction: None,
                 mcp: None,
                 extra: serde_json::Value::Null,
             })

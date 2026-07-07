@@ -371,8 +371,8 @@ mod tests {
             assert_eq!(properties.session_id, "sess-456");
             assert_eq!(properties.request_id, "req-123");
             assert_eq!(
-                properties.reason,
-                Some("User cancelled the operation".to_string())
+                properties.extra["reason"],
+                "User cancelled the operation"
             );
         }
     }
@@ -388,7 +388,7 @@ mod tests {
         }"#;
         let event: Event = serde_json::from_str(json).unwrap();
         if let Event::QuestionRejected { properties } = &event {
-            assert!(properties.reason.is_none());
+            assert!(properties.extra.get("reason").is_none());
         }
     }
 

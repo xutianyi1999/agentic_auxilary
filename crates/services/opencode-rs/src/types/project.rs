@@ -57,17 +57,21 @@ pub struct Project {
     pub extra: serde_json::Value,
 }
 
-/// Project icon definition.
+/// Project icon definition (matches TS `ProjectIcon`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectIcon {
-    /// Icon type (e.g., "emoji", "url", "lucide").
+    /// Icon URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub r#type: Option<String>,
+    pub url: Option<String>,
 
-    /// Icon value (emoji character, URL, or icon name).
+    /// Override icon type.
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "override")]
+    pub override_: Option<String>,
+
+    /// Icon color.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub value: Option<String>,
+    pub color: Option<String>,
 
     /// Additional icon properties.
     #[serde(flatten)]
@@ -120,7 +124,10 @@ pub struct ProjectSettings {
 }
 
 // TODO(3): Derive PartialEq on ModelRef, Project, ProjectSettings, UpdateProjectRequest for testing convenience
-/// Reference to a model (1.3.17 uses `providerID`/`modelID` casing).
+/// Reference to a model.
+///
+/// TS has two wire shapes — `{providerID, modelID}` (in MessageInfo) and
+/// `{id, providerID}` (in Session / session.next events).  Both are accepted.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelRef {
     /// Provider identifier.
@@ -130,15 +137,27 @@ pub struct ModelRef {
         skip_serializing_if = "Option::is_none"
     )]
     pub provider_id: Option<String>,
-    /// Model identifier.
+    /// Model identifier (Shape 1: `modelID`).
     #[serde(rename = "modelID", default, skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
+    /// Model identifier (Shape 2: `id`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
     /// Optional model variant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub variant: Option<String>,
     /// Additional fields from server.
     #[serde(flatten)]
     pub extra: serde_json::Value,
+}
+
+impl ModelRef {
+    /// Canonical model identifier, preferring `modelID` then `id`.
+    pub fn resolved_id(&self) -> Option<&str> {
+        self.model_id
+            .as_deref()
+            .or(self.id.as_deref())
+    }
 }
 
 /// Request to update a project.
@@ -186,8 +205,7 @@ mod tests {
             "worktree": "/path/to/worktree",
             "vcs": "git",
             "icon": {
-                "type": "emoji",
-                "value": "rocket"
+                "url": "https://example.com/icon.png"
             },
             "time": {
                 "created": 1234567890,
@@ -203,8 +221,7 @@ mod tests {
         assert_eq!(project.vcs, Some("git".to_string()));
 
         let icon = project.icon.unwrap();
-        assert_eq!(icon.r#type, Some("emoji".to_string()));
-        assert_eq!(icon.value, Some("rocket".to_string()));
+        assert_eq!(icon.url, Some("https://example.com/icon.png".to_string()));
 
         let time = project.time.unwrap();
         assert_eq!(time.created, Some(1_234_567_890));
@@ -216,10 +233,10 @@ mod tests {
 
     #[test]
     fn test_project_icon() {
-        let json = r#"{"type": "url", "value": "https://example.com/icon.png"}"#;
+        let json = r#"{"url": "https://example.com/icon.png", "override": "emoji"}"#;
         let icon: ProjectIcon = serde_json::from_str(json).unwrap();
-        assert_eq!(icon.r#type, Some("url".to_string()));
-        assert_eq!(icon.value, Some("https://example.com/icon.png".to_string()));
+        assert_eq!(icon.url, Some("https://example.com/icon.png".to_string()));
+        assert_eq!(icon.override_, Some("emoji".to_string()));
     }
 
     #[test]
@@ -284,6 +301,7 @@ mod tests {
         let model_ref = ModelRef {
             provider_id: Some("openai".to_string()),
             model_id: Some("gpt-4".to_string()),
+            id: None,
             variant: Some("turbo".to_string()),
             extra: serde_json::Value::Null,
         };

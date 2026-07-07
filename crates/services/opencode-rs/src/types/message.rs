@@ -23,10 +23,24 @@ pub struct MessageInfo {
     /// Agent name if applicable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<String>,
-    // Upstream parity fields
-    /// Message format.
+    /// Message mode (assistant messages, e.g. "plan").
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub format: Option<String>,
+    pub mode: Option<String>,
+    /// Model variant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant: Option<String>,
+    /// Error for failed assistant messages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<serde_json::Value>,
+    /// Summary for user messages (`{title?, body?, diffs}`) or assistant
+    /// messages (`boolean`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<serde_json::Value>,
+    // Upstream parity fields
+    /// Message format (TS typed union — `"text"`, `{type:"text"}`, or
+    /// `{type:"json_schema", schema:{…}}`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<serde_json::Value>,
     /// Model reference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<crate::types::project::ModelRef>,
@@ -116,6 +130,24 @@ pub struct MessageTime {
     pub completed: Option<i64>,
 }
 
+/// Part-level timing (start/end).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PartTime {
+    /// Start timestamp (ms).
+    pub start: i64,
+    /// End timestamp (ms).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<i64>,
+}
+
+/// Retry-specific timing (TS `{created}`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetryTime {
+    /// Creation timestamp.
+    pub created: i64,
+}
+
 /// A message with its parts (API response format).
 ///
 /// This is the format returned by the message list endpoint.
@@ -157,16 +189,25 @@ pub enum Part {
     /// Text content.
     Text {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
         /// Text content.
         text: String,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Whether this is synthetic (generated).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         synthetic: Option<bool>,
         /// Whether this part is ignored.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         ignored: Option<bool>,
+        /// Part timing.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        time: Option<PartTime>,
         /// Additional metadata.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         metadata: Option<serde_json::Value>,
@@ -174,8 +215,14 @@ pub enum Part {
     /// File attachment.
     File {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// MIME type.
         mime: String,
         /// File URL.
@@ -190,17 +237,20 @@ pub enum Part {
     /// Tool invocation.
     Tool {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Tool call ID.
         #[serde(rename = "callID")]
         call_id: String,
         /// Tool name.
         tool: String,
-        /// Tool input arguments.
-        #[serde(default)]
-        input: serde_json::Value,
-        /// Tool execution state.
+        /// Tool execution state (includes input).
         #[serde(default)]
         state: Option<ToolState>,
         /// Additional metadata.
@@ -212,8 +262,17 @@ pub enum Part {
         /// Part identifier.
         #[serde(default)]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Reasoning text.
         text: String,
+        /// Part timing.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        time: Option<PartTime>,
         /// Additional metadata.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         metadata: Option<serde_json::Value>,
@@ -222,8 +281,14 @@ pub enum Part {
     #[serde(rename = "step-start")]
     StepStart {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Snapshot ID.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         snapshot: Option<String>,
@@ -232,8 +297,14 @@ pub enum Part {
     #[serde(rename = "step-finish")]
     StepFinish {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Finish reason.
         reason: String,
         /// Snapshot ID.
@@ -249,16 +320,28 @@ pub enum Part {
     /// Snapshot marker.
     Snapshot {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Snapshot ID.
         snapshot: String,
     },
     /// Patch information.
     Patch {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Patch hash.
         hash: String,
         /// Affected files.
@@ -268,8 +351,14 @@ pub enum Part {
     /// Agent delegation.
     Agent {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Agent name.
         name: String,
         /// Agent source info.
@@ -279,34 +368,64 @@ pub enum Part {
     /// Retry marker.
     Retry {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Attempt number.
         attempt: u32,
         /// Error that caused retry.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        error: Option<crate::types::error::APIError>,
+        error: Option<crate::types::error::ApiError>,
+        /// Timing (TS: `{created}`).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        time: Option<RetryTime>,
     },
     /// Compaction marker.
     Compaction {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Whether this was automatic.
         #[serde(default)]
         auto: bool,
+        /// Whether compaction overflowed.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        overflow: Option<bool>,
+        /// Tail start message ID after compaction.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "tail_start_id")]
+        tail_start_id: Option<String>,
     },
     /// Subtask delegation.
     Subtask {
         /// Part identifier.
-        #[serde(default)]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
+        /// Session ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionID")]
+        session_id: Option<String>,
+        /// Parent message ID.
+        #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+        message_id: Option<String>,
         /// Subtask prompt.
         prompt: String,
         /// Subtask description.
         description: String,
         /// Agent to handle subtask.
         agent: String,
+        /// Model reference.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<crate::types::project::ModelRef>,
         /// Optional command.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         command: Option<String>,
@@ -468,9 +587,9 @@ pub struct ToolStateCompleted {
     pub metadata: serde_json::Value,
     /// Execution time range.
     pub time: ToolTimeRange,
-    /// File attachments.
+    /// File attachments (TS: `Array<FilePart>`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attachments: Option<Vec<serde_json::Value>>,
+    pub attachments: Option<Vec<Part>>,
     /// Additional fields.
     #[serde(flatten)]
     pub extra: serde_json::Value,
@@ -947,7 +1066,7 @@ mod tests {
         assert_eq!(info.id, "msg-123");
         assert_eq!(info.session_id, Some("sess-456".to_string()));
         assert_eq!(info.role, "assistant");
-        assert_eq!(info.format, Some("markdown".to_string()));
+        assert_eq!(info.format, Some(serde_json::Value::String("markdown".to_string())));
         assert!(info.model.is_some());
         assert_eq!(
             info.model.as_ref().unwrap().provider_id,
@@ -974,15 +1093,15 @@ mod tests {
     }
 
     #[test]
-    fn test_message_info_top_level_variant_is_not_typed() {
+    fn test_message_info_variant_field() {
         let json = r#"{
             "id": "msg-123",
-            "role": "user",
+            "role": "assistant",
             "time": {"created": 1234567890},
-            "variant": "legacy-top-level"
+            "variant": "turbo"
         }"#;
         let info: MessageInfo = serde_json::from_str(json).unwrap();
-        assert_eq!(info.extra["variant"], "legacy-top-level");
+        assert_eq!(info.variant, Some("turbo".to_string()));
     }
 
     #[test]

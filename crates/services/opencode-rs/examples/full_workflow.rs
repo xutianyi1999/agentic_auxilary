@@ -105,8 +105,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Some(Event::MessagePartUpdated { properties }) => {
                         if let Some(delta) = &properties.delta {
-                            print!("{delta}");
-                            response_text.push_str(delta);
+                            if let Some(s) = delta.as_str() {
+                                print!("{s}");
+                                response_text.push_str(s);
+                            }
                         }
                     }
                     Some(_) => {
@@ -155,7 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for todo in &todos {
         println!(
             "   - [{}] {}",
-            if todo.completed { "x" } else { " " },
+            if todo.status == "completed" { "x" } else { " " },
             todo.content
         );
     }

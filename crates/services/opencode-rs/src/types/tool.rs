@@ -338,6 +338,7 @@ mod tests {
             model: Some(ModelRef {
                 provider_id: Some("openai".to_string()),
                 model_id: Some("gpt-4".to_string()),
+                id: None,
                 variant: None,
                 extra: serde_json::Value::Null,
             }),

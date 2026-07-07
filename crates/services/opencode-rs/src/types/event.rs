@@ -2,7 +2,7 @@
 //!
 //! Contains 40 event variants matching `OpenCode`'s server.ts.
 
-use crate::types::error::APIError;
+use crate::types::error::{ApiError, ApiErrorData};
 use crate::types::message::Message;
 use crate::types::message::Part;
 use crate::types::permission::PermissionReply;
@@ -127,6 +127,9 @@ pub enum SyncEvent {
         aggregate_id: String,
         data: Box<SyncSessionData>,
     },
+    /// Unknown sync event (forward compatibility).
+    #[serde(other)]
+    Unknown,
 }
 
 /// Data for `message.updated.1` sync events.
@@ -406,13 +409,6 @@ pub enum Event {
     PermissionV2Asked {
         /// Event properties with permission request.
         properties: PermissionV2AskedProps,
-    },
-
-    /// Permission replied next.
-    #[serde(rename = "permission.replied-next")]
-    PermissionRepliedNext {
-        /// Event properties with reply info.
-        properties: PermissionRepliedProps,
     },
 
     /// Permission replied (V2).
@@ -779,6 +775,36 @@ pub enum Event {
     SessionNextCompactionEnded {
         properties: SessionNextProps,
     },
+    /// Session next moved (directory changed).
+    #[serde(rename = "session.next.moved")]
+    SessionNextMoved {
+        properties: SessionNextProps,
+    },
+    /// Session next prompt admitted.
+    #[serde(rename = "session.next.prompt.admitted")]
+    SessionNextPromptAdmitted {
+        properties: SessionNextProps,
+    },
+    /// Session next context updated.
+    #[serde(rename = "session.next.context.updated")]
+    SessionNextContextUpdated {
+        properties: SessionNextProps,
+    },
+    /// Session next revert staged.
+    #[serde(rename = "session.next.revert.staged")]
+    SessionNextRevertStaged {
+        properties: SessionNextProps,
+    },
+    /// Session next revert cleared.
+    #[serde(rename = "session.next.revert.cleared")]
+    SessionNextRevertCleared {
+        properties: SessionNextProps,
+    },
+    /// Session next revert committed.
+    #[serde(rename = "session.next.revert.committed")]
+    SessionNextRevertCommitted {
+        properties: SessionNextProps,
+    },
 
     /// Fallback for unknown event types.
     #[serde(other)]
@@ -809,12 +835,18 @@ pub struct SessionIdleProps {
     pub extra: serde_json::Value,
 }
 
-/// Error union that can be `APIError` or unknown value.
+/// Error union matching TS `session.error` payload.
+///
+/// TS sends errors as `{name, data}` wrappers, but older servers may send flat
+/// error fields directly.  The untagged variant order tries the TS-compatible
+/// wrapper first, then falls back to flat data, then unknown.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AssistantError {
-    /// Known API error.
-    Api(APIError),
+    /// TS-compatible `{name, data}` wrapping (preferred).
+    Api(ApiError),
+    /// Flat error data (legacy servers).
+    Flat(ApiErrorData),
     /// Unknown error format (forward compatibility).
     Unknown(serde_json::Value),
 }
@@ -860,7 +892,8 @@ pub struct MessageRemovedProps {
     pub extra: serde_json::Value,
 }
 
-/// Properties for message part update events.
+/// Properties for message part update events (shared by both
+/// `message.part.updated` and `message.part.delta`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessagePartEventProps {
     /// Session ID.
@@ -872,12 +905,22 @@ pub struct MessagePartEventProps {
     /// Part index.
     #[serde(default)]
     pub index: Option<usize>,
-    /// Updated part content.
+    /// Updated part content (present in `part.updated`).
     #[serde(default)]
     pub part: Option<crate::types::message::Part>,
-    /// Streaming delta (incremental text or JSON tool args).
+    /// Streaming delta (incremental text or JSON tool args, present in
+    /// `part.delta`).
     #[serde(default)]
     pub delta: Option<serde_json::Value>,
+    /// Part ID (present in `part.delta`).
+    #[serde(default, rename = "partID")]
+    pub part_id: Option<String>,
+    /// Field being streamed (present in `part.delta`, e.g. `"text"`).
+    #[serde(default)]
+    pub field: Option<String>,
+    /// Timestamp (present in `part.updated`).
+    #[serde(default)]
+    pub time: Option<i64>,
     /// Additional properties.
     #[serde(flatten)]
     pub extra: serde_json::Value,
@@ -955,12 +998,49 @@ pub struct PermissionV2Source {
 // ==================== Session Next Event Properties ====================
 
 /// Generic properties for session.next.* events.
+///
+/// Captures the fields common to most session.next variants.  Variant-specific
+/// fields (agent, model, prompt, delivery, tool input, output, …) are preserved
+/// in `extra`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionNextProps {
     /// Session ID.
     #[serde(rename = "sessionID")]
     pub session_id: String,
-    /// Additional properties.
+    /// Event timestamp.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timestamp: Option<i64>,
+    /// ID of the assistant message being produced.
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "assistantMessageID")]
+    pub assistant_message_id: Option<String>,
+    /// Message ID (present on text/reasoning/compaction/shell variants).
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "messageID")]
+    pub message_id: Option<String>,
+    /// Tool / shell call ID.
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "callID")]
+    pub call_id: Option<String>,
+    /// Tool name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<String>,
+    /// Shell command being executed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    /// Streaming delta.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delta: Option<String>,
+    /// Shell / tool output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
+    /// Error information.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<serde_json::Value>,
+    /// Agent name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// Step name.
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "stepName")]
+    pub step_name: Option<String>,
+    /// Additional variant-specific properties.
     #[serde(flatten)]
     pub extra: serde_json::Value,
 }
@@ -1001,9 +1081,6 @@ pub struct QuestionRejectedProps {
     /// Request ID that was rejected.
     #[serde(rename = "requestID")]
     pub request_id: String,
-    /// Optional reason for rejection.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reason: Option<String>,
     /// Additional properties.
     #[serde(flatten)]
     pub extra: serde_json::Value,
@@ -1027,7 +1104,7 @@ impl Event {
             }
             Self::PermissionAsked { properties } => Some(&properties.request.session_id),
             Self::PermissionV2Asked { properties } => Some(&properties.session_id),
-            Self::PermissionReplied { properties } | Self::PermissionRepliedNext { properties } | Self::PermissionV2Replied { properties } => {
+            Self::PermissionReplied { properties } | Self::PermissionV2Replied { properties } => {
                 Some(&properties.session_id)
             }
             Self::QuestionAsked { properties } => Some(&properties.request.session_id),
@@ -1058,10 +1135,25 @@ impl Event {
             | Self::SessionNextToolProgress { properties }
             | Self::SessionNextToolSuccess { properties }
             | Self::SessionNextToolFailed { properties }
-            | Self::SessionNextRetried { properties }
-            | Self::SessionNextCompactionStarted { properties }
-            | Self::SessionNextCompactionDelta { properties }
-            | Self::SessionNextCompactionEnded { properties } => Some(&properties.session_id),
+             | Self::SessionNextRetried { properties }
+             | Self::SessionNextCompactionStarted { properties }
+             | Self::SessionNextCompactionDelta { properties }
+             | Self::SessionNextCompactionEnded { properties }
+             | Self::SessionNextMoved { properties }
+             | Self::SessionNextPromptAdmitted { properties }
+             | Self::SessionNextContextUpdated { properties }
+             | Self::SessionNextRevertStaged { properties }
+             | Self::SessionNextRevertCleared { properties }
+             | Self::SessionNextRevertCommitted { properties } => Some(&properties.session_id),
+            // Variants stored as untyped `Value` that carry sessionID.
+            Self::SessionDiff { properties }
+            | Self::SessionCompacted { properties }
+            | Self::SessionStatus { properties }
+            | Self::MessagePartRemoved { properties }
+            | Self::CommandExecuted { properties }
+            | Self::TodoUpdated { properties } => {
+                properties.get("sessionID").and_then(|v| v.as_str())
+            }
             _ => None,
         }
     }
@@ -1201,16 +1293,20 @@ mod tests {
             "type": "session.error",
             "properties": {
                 "sessionID": "sess-456",
-                "error": {"message": "Something went wrong", "isRetryable": false}
+                "error": {"name": "APIError", "data": {"message": "Something went wrong", "isRetryable": false}}
             }
         }"#;
         let event: Event = serde_json::from_str(json).unwrap();
         if let Event::SessionError { properties } = &event {
             assert!(properties.error.is_some());
-            if let Some(AssistantError::Api(err)) = &properties.error {
-                assert_eq!(err.message, "Something went wrong");
-            } else {
-                panic!("Expected APIError");
+            match &properties.error {
+                Some(AssistantError::Api(err)) => {
+                    assert_eq!(err.data.message, "Something went wrong");
+                }
+                Some(AssistantError::Flat(err)) => {
+                    assert_eq!(err.message, "Something went wrong");
+                }
+                _ => panic!("Expected APIError"),
             }
         } else {
             panic!("Expected SessionError");
@@ -1273,7 +1369,7 @@ mod tests {
         if let Event::QuestionRejected { properties } = &event {
             assert_eq!(properties.session_id, "sess-456");
             assert_eq!(properties.request_id, "req-123");
-            assert_eq!(properties.reason, Some("User cancelled".to_string()));
+            assert_eq!(properties.extra["reason"], "User cancelled");
         } else {
             panic!("Expected QuestionRejected");
         }
