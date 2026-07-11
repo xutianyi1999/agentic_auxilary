@@ -235,7 +235,26 @@ impl SseSubscriber {
                             }
 
                             // Parse event
-                            match serde_json::from_str::<T>(&msg.data) {
+                            let data = match serde_json::from_str::<serde_json::Value>(&msg.data) {
+                                Ok(val) => {
+                                    // V2 wrapped format: { id, type, data: { ... } }
+                                    // Promote data fields to top-level for flat deserialization
+                                    if let Some(data_obj) = val.get("data").and_then(|d| d.as_object()) {
+                                        let mut obj = val.as_object().cloned().unwrap_or_default();
+                                        obj.remove("data");
+                                        for (k, v) in data_obj {
+                                            obj.insert(k.clone(), v.clone());
+                                        }
+                                        serde_json::to_string(&serde_json::Value::Object(obj))
+                                            .unwrap_or_else(|_| msg.data.clone())
+                                    } else {
+                                        msg.data.clone()
+                                    }
+                                }
+                                Err(_) => msg.data.clone(),
+                            };
+
+                            match serde_json::from_str::<T>(&data) {
                                 Ok(ev) => {
                                     if should_send.as_ref()(&ev) && tx.send(ev).await.is_err() {
                                         es.close();
